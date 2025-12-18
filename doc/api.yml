@@ -1,0 +1,523 @@
+openapi: 3.0.3
+info:
+  title: P.A.I.N. API
+  description: >-
+    API for the P.A.I.N. dashboard (Personal Digital Impact Auditing Platform).
+    This version describes the MVP focused on diagnostics (PAIN Score), data
+    and time snapshots, the dashboard, and one-time breach checks.
+  version: 0.1.0
+
+servers:
+  - url: /dev
+    description: Default environment (Lambda/API Gateway)
+
+tags:
+  - name: Score
+    description: PAIN Score calculation and retrieval
+  - name: Snapshots
+    description: Data and time snapshot creation and retrieval
+  - name: Dashboard
+    description: Aggregated view of main indicators
+  - name: Security
+    description: One-time breach verification and associated risk
+
+paths:
+  /api/score/preview:
+    post:
+      tags: [Score]
+      summary: Preview a PAIN Score from a fully supplied context.
+      description: >-
+        Preview endpoint for the PAIN Score. Does not persist any snapshot or score,
+        but allows testing the formula from a complete context.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PainScorePreviewRequest'
+      responses:
+        '200':
+          description: PAIN Score calculated from the supplied context.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PainScoreResult'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/me/snapshots/data:
+    post:
+      tags: [Snapshots]
+      summary: Create a data footprint snapshot (emails + cloud).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataSnapshotRequest'
+      responses:
+        '201':
+          description: Data snapshot created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataSnapshot'
+        '400':
+          description: Invalid snapshot data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+
+  /api/me/snapshots/data/latest:
+    get:
+      tags: [Snapshots]
+      summary: Retrieve the latest data footprint snapshot for the current user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Latest data snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataSnapshot'
+        '204':
+          description: No snapshot available.
+        '401':
+          description: Unauthorized.
+
+  /api/me/snapshots/time-usage:
+    post:
+      tags: [Snapshots]
+      summary: Create a time usage snapshot (screen time + interruptions).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimeUsageSnapshotRequest'
+      responses:
+        '201':
+          description: Time snapshot created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeUsageSnapshot'
+        '400':
+          description: Invalid snapshot data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+
+  /api/me/snapshots/time-usage/latest:
+    get:
+      tags: [Snapshots]
+      summary: Retrieve the latest time usage snapshot for the current user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Latest time snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeUsageSnapshot'
+        '204':
+          description: No snapshot available.
+        '401':
+          description: Unauthorized.
+
+  /api/me/score:
+    post:
+      tags: [Score]
+      summary: Compute a new PAIN Score from the user’s latest snapshots.
+      description: >-
+        Computes a new PAIN Score for the current user from the latest
+        Data / Time (and optionally Security) snapshots, persists the result,
+        and returns it.
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: New PAIN Score computed and persisted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PainScoreSnapshot'
+        '400':
+          description: Insufficient or inconsistent snapshots to compute a score.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+
+    get:
+      tags: [Score]
+      summary: Retrieve the latest PAIN Score for the current user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Latest PAIN Score available.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PainScoreSnapshot'
+        '204':
+          description: No score has been computed yet.
+        '401':
+          description: Unauthorized.
+
+  /api/me/score/history:
+    get:
+      tags: [Score]
+      summary: Retrieve the history of PAIN Scores for the current user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+          required: false
+          description: Filter scores from this date (inclusive).
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+          required: false
+          description: Filter scores up to this date (inclusive).
+      responses:
+        '200':
+          description: List of persisted PAIN Scores.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PainScoreSnapshot'
+        '401':
+          description: Unauthorized.
+
+  /api/me/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Retrieve an aggregated P.A.I.N. diagnostic view for the current user.
+      description: >-
+        Returns in a single call the latest PAIN Score, a few history points,
+        the latest Data snapshot, the latest Time snapshot, and the latest breach check
+        result (if any).
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Aggregated P.A.I.N. dashboard view.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+        '401':
+          description: Unauthorized.
+
+  /api/me/security-checks:
+    post:
+      tags: [Security]
+      summary: Trigger a one-time breach check for the user’s email address.
+      description: >-
+        Queries one or more public breach sources for the current user’s email address,
+        stores a synthetic `SecurityCheck` (no detailed breach list), and returns the result.
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Check performed, result returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityCheck'
+        '401':
+          description: Unauthorized.
+
+  /api/me/security-checks/latest:
+    get:
+      tags: [Security]
+      summary: Retrieve the latest breach check result for the current user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Latest `SecurityCheck` available.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityCheck'
+        '204':
+          description: No check has been performed yet.
+        '401':
+          description: Unauthorized.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: string
+
+    PainScorePreviewRequest:
+      type: object
+      description: Full context to compute a PAIN Score in preview mode.
+      properties:
+        estimatedTotalStorageBytes:
+          type: integer
+          format: int64
+          description: Total estimated storage volume (emails + cloud), in bytes.
+        servicesCount:
+          type: integer
+          format: int32
+          description: Number of connected digital services.
+        screenTimeHoursPerWeek:
+          type: number
+          format: double
+          description: Estimated weekly screen time, in hours.
+        estimatedInterruptionsPerDay:
+          type: integer
+          format: int32
+          description: Average number of interruptions/notifications per day.
+        hasSecurityCheck:
+          type: boolean
+          description: Indicates whether breach check data is available.
+        breachFound:
+          type: boolean
+          description: Indicates whether at least one breach was detected.
+        breachCount:
+          type: integer
+          format: int32
+          description: Number of known breaches associated with the address.
+        maxSeverity:
+          $ref: '#/components/schemas/SecuritySeverity'
+        securityCheckedAt:
+          type: string
+          format: date-time
+          description: Date/time of the last breach check.
+        hasEmailConnection:
+          type: boolean
+          description: Indicates whether a real email connection is used for data.
+        hasCloudDeclaration:
+          type: boolean
+          description: Indicates whether a cloud storage volume has been declared.
+        hasDataSnapshotsOverOneMonth:
+          type: boolean
+          description: Indicates whether at least two data snapshots exist more than one month apart.
+        hasRegularTimeUpdates:
+          type: boolean
+          description: Indicates whether the user regularly updates time data.
+        hasObjectiveTimeSource:
+          type: boolean
+          description: Indicates whether an objective screen time source is used (Screen Time, etc.).
+
+    PainScoreResult:
+      type: object
+      description: PAIN Score computation result and its confidences.
+      properties:
+        scoreGlobal:
+          type: integer
+          format: int32
+        scoreData:
+          type: integer
+          format: int32
+        scoreTime:
+          type: integer
+          format: int32
+        scoreRisk:
+          type: integer
+          format: int32
+        confidenceGlobal:
+          type: integer
+          format: int32
+        confidenceData:
+          type: integer
+          format: int32
+        confidenceTime:
+          type: integer
+          format: int32
+        confidenceRisk:
+          type: integer
+          format: int32
+        version:
+          type: string
+      required:
+        - scoreGlobal
+        - scoreData
+        - scoreTime
+        - scoreRisk
+        - confidenceGlobal
+        - confidenceData
+        - confidenceTime
+        - confidenceRisk
+        - version
+
+    PainScoreSnapshot:
+      allOf:
+        - $ref: '#/components/schemas/PainScoreResult'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            createdAt:
+              type: string
+              format: date-time
+
+    DataSnapshotRequest:
+      type: object
+      description: Data needed to create a data footprint snapshot.
+      properties:
+        emailCountTotal:
+          type: integer
+          format: int64
+          description: Estimated total number of emails.
+        estimatedEmailStorageBytes:
+          type: integer
+          format: int64
+          description: Estimated volume occupied by emails, in bytes.
+        declaredCloudStorageBytes:
+          type: integer
+          format: int64
+          description: Declared cloud storage volume, in bytes.
+      required:
+        - estimatedEmailStorageBytes
+
+    DataSnapshot:
+      type: object
+      description: Data footprint snapshot for a user.
+      properties:
+        id:
+          type: string
+          format: uuid
+        takenAt:
+          type: string
+          format: date-time
+        emailCountTotal:
+          type: integer
+          format: int64
+        estimatedEmailStorageBytes:
+          type: integer
+          format: int64
+        declaredCloudStorageBytes:
+          type: integer
+          format: int64
+        estimatedTotalStorageBytes:
+          type: integer
+          format: int64
+      required:
+        - id
+        - takenAt
+        - estimatedTotalStorageBytes
+
+    TimeUsageSnapshotRequest:
+      type: object
+      description: Data needed to create a time usage snapshot.
+      properties:
+        screenTimeHoursPerWeek:
+          type: number
+          format: double
+          description: Declared weekly screen time, in hours.
+        estimatedInterruptionsPerDay:
+          type: integer
+          format: int32
+          description: Average number of interruptions/notifications per day.
+      required:
+        - screenTimeHoursPerWeek
+
+    TimeUsageSnapshot:
+      type: object
+      description: Time usage snapshot for a user.
+      properties:
+        id:
+          type: string
+          format: uuid
+        takenAt:
+          type: string
+          format: date-time
+        screenTimeHoursPerWeek:
+          type: number
+          format: double
+        estimatedInterruptionsPerDay:
+          type: integer
+          format: int32
+      required:
+        - id
+        - takenAt
+        - screenTimeHoursPerWeek
+
+    SecuritySeverity:
+      type: string
+      description: Maximum severity level of known breaches.
+      enum: [LOW, MEDIUM, HIGH]
+
+    SecurityCheck:
+      type: object
+      description: Synthetic result of a breach verification.
+      properties:
+        id:
+          type: string
+          format: uuid
+        checkedAt:
+          type: string
+          format: date-time
+        breachFound:
+          type: boolean
+        breachCount:
+          type: integer
+          format: int32
+        maxSeverity:
+          $ref: '#/components/schemas/SecuritySeverity'
+        provider:
+          type: string
+          description: Name of the service/source used for the verification.
+
+    DashboardResponse:
+      type: object
+      description: Aggregated P.A.I.N. diagnostic view for the user.
+      properties:
+        currentScore:
+          $ref: '#/components/schemas/PainScoreSnapshot'
+        scoreHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/PainScoreSnapshot'
+        latestDataSnapshot:
+          $ref: '#/components/schemas/DataSnapshot'
+        latestTimeUsageSnapshot:
+          $ref: '#/components/schemas/TimeUsageSnapshot'
+        latestSecurityCheck:
+          $ref: '#/components/schemas/SecurityCheck'
