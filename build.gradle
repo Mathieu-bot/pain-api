@@ -107,6 +107,40 @@ jacocoTestReport {
     }
 }
 
+def openApiDir = "$projectDir/doc"
+def openApiFile = "$openApiDir/api.yml"
+def generatedSourcesDir = "$buildDir/generated"
+
+openApiGenerate {
+    generatorName.set("spring")
+    inputSpec.set(openApiFile)
+    outputDir.set(generatedSourcesDir)
+    apiPackage.set("io.pain.api.gen.api")
+    modelPackage.set("io.pain.api.gen.model")
+    invokerPackage.set("io.pain.api.gen.invoker")
+    configOptions.set([
+            dateLibrary: "java8",
+            interfaceOnly: "true",
+            useSpringBoot3: "true",
+            useBeanValidation: "false",
+            useTags: "true",
+            openApiNullable: "false",
+            serializationLibrary: "jackson",
+            library: "spring-boot",
+            generateSupportingFiles: "false"
+    ])
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir "${generatedSourcesDir}/src/main/java"
+        }
+    }
+}
+
+compileJava.dependsOn tasks.openApiGenerate
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web:3.2.2'
 
@@ -139,6 +173,8 @@ dependencies {
 
     implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
     implementation 'io.swagger:swagger-annotations:1.6.12'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+    compileOnly 'jakarta.validation:jakarta.validation-api:3.0.2'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test:3.2.2'
     testImplementation 'org.testcontainers:junit-jupiter:1.19.1'
