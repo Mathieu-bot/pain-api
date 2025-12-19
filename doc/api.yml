@@ -21,6 +21,7 @@ tags:
   - name: Security
     description: One-time breach verification and associated risk
 
+
 paths:
   /api/score/preview:
     post:
