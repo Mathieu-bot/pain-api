@@ -16,8 +16,7 @@ public record PainScoreContext(
     boolean hasCloudDeclaration,
     boolean hasDataSnapshotsOverOneMonth,
     boolean hasRegularTimeUpdates,
-    boolean hasObjectiveTimeSource
-) {
+    boolean hasObjectiveTimeSource) {
   public enum SecuritySeverity {
     LOW,
     MEDIUM,

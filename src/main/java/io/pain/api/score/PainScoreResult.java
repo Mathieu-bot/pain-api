@@ -9,5 +9,4 @@ public record PainScoreResult(
     int confidenceData,
     int confidenceTime,
     int confidenceRisk,
-    String version
-) {}
+    String version) {}

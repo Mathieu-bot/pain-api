@@ -2,7 +2,6 @@ package io.pain.api.score;
 
 import java.time.Duration;
 import java.time.Instant;
-
 import org.springframework.stereotype.Component;
 
 @Component
