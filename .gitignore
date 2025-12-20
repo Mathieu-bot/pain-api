@@ -41,3 +41,21 @@ out/
 
 ### Mac OS ###
 .DS_Store
+
+### H2 database ###
+*.db
+*.mv.db
+*.trace.db
+
+### Logs ###
+logs/
+*.log
+
+### Local config ###
+application-local.properties
+.env
+.env.local
+
+### Generated sources ###
+build/generated/
+!build/generated/src/main/java/
